@@ -62,6 +62,9 @@ class CoolSystem(pl.LightningModule):
 
         if augmentation_backend == 'kornia':
             self.augmentation = torch.nn.Sequential(
+                K.augmentation.ColorJitter(
+                    brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5
+                ),
                 K.augmentation.RandomAffine(
                     [-45., 45.], [0., 0.5], [0.5, 1.5], [0., 0.5]
                 ),
@@ -72,6 +75,9 @@ class CoolSystem(pl.LightningModule):
         elif augmentation_backend == 'torchvision':
             self.augmentation = None
             self.transform = T.transforms.Compose([
+                T.transforms.ColorJitter(
+                    brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5
+                ),
                 T.transforms.RandomAffine(
                     [-45., 45.], [0., 0.5], [0.5, 1.5], [0., 0.5]
                 ),
@@ -117,6 +123,7 @@ from pytorch_lightning import Trainer
 devices = ['cpu', 'gpu']
 
 backends = ['kornia', 'torchvision']
+backends = ['torchvision']
 
 batch_sizes = [16, 32, 64, 128, 256, 512, 1028, 2048]
 

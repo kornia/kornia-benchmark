@@ -109,7 +109,6 @@ class CoolSystem(pl.LightningModule):
 
     def prepare_data(self):
         MNIST(os.getcwd(), train=True, download=True, transform=self.transform)
-        MNIST(os.getcwd(), train=False, download=True, transform=self.transform)
 
     def train_dataloader(self):
         # REQUIRED
