@@ -1,13 +1,16 @@
 import timeit
+import os
+import numpy as np
+import pandas as pd
 
-general_setup = lambda img_size: f"""
+
+general_setup = lambda batch_size, img_size: f"""
 import torch
 import kornia
 from torchvision.transforms import transforms
 
-batch_size = 1
-in_tensor = torch.randn(batch_size, 3, {img_size}, {img_size}).to('cuda:0')
-in_pil = transforms.ToPILImage()(in_tensor.cpu().squeeze())
+in_tensor = torch.randn({batch_size}, 3, {img_size}, {img_size}).to('cuda:0')
+in_pil = transforms.ToPILImage()(in_tensor.cpu()[0])
 
 """
 
@@ -48,7 +51,7 @@ kor_fn = kornia.augmentation.RandomCrop((180, 180))
 
 erasing_setup = """
 tv_fn = transforms.RandomErasing(p=1.0)
-kor_fn = kornia.augmentation.RandomErasing((0.02, 0.33), (0.3, 3.3))
+kor_fn = kornia.augmentation.RandomErasing(1.0, (0.02, 0.33), (0.3, 3.3))
 """
 
 grayscale_setup = """
@@ -68,6 +71,7 @@ kor_fn = kornia.augmentation.CenterCrop((180, 180))
 
 
 if __name__ == '__main__':
+    save_to = "op_benchmark"
     image_sizes = {
         # Coefficients:   size
         'efficientnet-b0': 224,
@@ -78,36 +82,58 @@ if __name__ == '__main__':
         'efficientnet-b5': 456,
         'efficientnet-b6': 528,
         'efficientnet-b7': 600,
-        'efficientnet-b8': 672,
-        'efficientnet-l2': 800,
     }
     fn_set_ups = {
-        'perspective_setup': perspective_setup,
-        'colorjitter_setup': colorjitter_setup,
-        'affine_setup': affine_setup,
-        'vflip_setup': vflip_setup,
-        'hflip_setup': hflip_setup,
-        'rotate_setup': rotate_setup,
-        'crop_setup': crop_setup,
-        'erasing_setup': erasing_setup,
-        'grayscale_setup': grayscale_setup,
-        'res_crop_setup': res_crop_setup,
-        'cent_crop_setup': cent_crop_setup
+        'RandomPerspective': perspective_setup,
+        'ColorJitter': colorjitter_setup,
+        'RandomAffine': affine_setup,
+        'RandomVerticalFlip': vflip_setup,
+        'RandomHorizontalFlip': hflip_setup,
+        'RandomRotate': rotate_setup,
+        'RandomCrop': crop_setup,
+        'RandomErasing': erasing_setup,
+        'RandomGrayscale': grayscale_setup,
+        'RandomResizedCrop': res_crop_setup,
+        'RandomCenterCrop': cent_crop_setup
     }
 
-    num = 100
-    for name in fn_set_ups:
-        for net in image_sizes:
-            tv = timeit.timeit(
-                "tv_fn(in_tensor.squeeze())" if name == 'erasing_setup' else "tv_fn(in_pil)" ,
-                setup=general_setup(image_sizes[net]) + fn_set_ups[name],
-                number=num
-            )
+    tv_timer = lambda batch_size, net, name: timeit.Timer(
+        f"[tv_fn({'in_tensor[0].squeeze()' if name == 'RandomErasing' else 'in_pil'}) for _ in range({batch_size})]" ,
+        setup=general_setup(batch_size, image_sizes[net]) + fn_set_ups[name]
+    )
+    
+    kor_timer = lambda batch_size, net, name: timeit.Timer(
+        "kor_fn(in_tensor)",
+        setup=general_setup(batch_size, image_sizes[net]) + fn_set_ups[name]
+    )
 
-            kor = timeit.timeit(
-                "kor_fn(in_tensor)",
-                setup=general_setup(image_sizes[net]) + fn_set_ups[name],
-                number=num
-            )
-            print(name, net, "image_size=%d" % image_sizes[net], "Torchvision: %.4fs" % (tv/num), \
-                "Kornia: %.4fs" % (kor/num), "Win" if kor < tv else "Lose")
+    try:
+        os.mkdir(save_to)
+    except:
+        pass
+
+    num = 10
+    batch_size = 1
+
+    for timer_name, batch_size, timer in [
+          ("torchvision", 1, tv_timer),
+          ("kornia", 1, kor_timer),
+          ("kornia", 2, kor_timer),
+          ("kornia", 4, kor_timer),
+          ("kornia", 8, kor_timer),
+          ("kornia", 16, kor_timer),
+          ("kornia", 32, kor_timer),
+          ("kornia", 64, kor_timer)
+    ]:
+        dfs = []
+        for name in fn_set_ups:
+            row_res = {'op_name': name}
+            for net in image_sizes:
+                timer = kor_timer(batch_size, net, name)
+                timer_res = timer.repeat(num, 1)
+
+                row_res.update({net: np.mean(timer_res) * 1000})
+                print(name, net, "image_size=%d" % image_sizes[net], "batchsize=%d" % batch_size, "%.2f±%.2fms" % (np.mean(timer_res) * 1000, np.std(timer_res) * 1000))
+            dfs.append(pd.DataFrame.from_dict(row_res, orient='index').T)
+        df = pd.concat(dfs)
+        df.to_csv(f"{save_to}/{timer_name}_bs{batch_size}.csv", index=None)
