@@ -71,7 +71,9 @@ kor_fn = kornia.augmentation.CenterCrop((180, 180))
 
 
 if __name__ == '__main__':
-    save_to = "op_benchmark"
+    save_to = "data"
+    num = 10
+
     image_sizes = {
         # Coefficients:   size
         'efficientnet-b0': 224,
@@ -111,9 +113,6 @@ if __name__ == '__main__':
         os.mkdir(save_to)
     except:
         pass
-
-    num = 10
-    batch_size = 1
 
     for timer_name, batch_size, timer in [
           ("torchvision", 1, tv_timer),
