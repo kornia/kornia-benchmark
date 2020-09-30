@@ -26,13 +26,14 @@ from torchvision.datasets import FakeData
 from torchvision.models import resnet18
 import torchvision as T
 
+
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 import pytorch_lightning as pl
 import kornia as K
 
 
 """## Define lightning model"""
-
-
 class CoolSystem(pl.LightningModule):
 
     def __init__(self, batch_size: int = 32, augmentation_backend: str = 'kornia', image_size=(3, 224, 224), mode='default'):
@@ -47,20 +48,29 @@ class CoolSystem(pl.LightningModule):
             self.augmentation = torch.nn.Sequential(
                 K.augmentation.RandomAffine([-45., 45.], [0., 0.5], [0.5, 1.5], [0., 0.5], p=1.),
                 K.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.1, p=1.),
-                K.augmentation.RandomPerspective(p=1.),
                 K.augmentation.Normalize(0.1307, 0.3081),
             )
-            self.transform = T.transforms.ToTensor()
+            self.transform = lambda x: K.image_to_tensor(np.array(x)).float() / 255.
 
         elif augmentation_backend == 'torchvision':
             self.augmentation = None
             self.transform = T.transforms.Compose([
                 T.transforms.RandomAffine([-45., 45.], [0., 0.5], [0.5, 1.5], [0., 0.5], resample=2),
                 T.transforms.ColorJitter(0.4, 0.4, 0.4, 0.1),
-                T.transforms.RandomPerspective(interpolation=Image.BILINEAR, p=1.),
                 T.transforms.ToTensor(),
                 T.transforms.Normalize((0.1307,), (0.3081,)),
             ])
+
+        elif augmentation_backend == 'albumentations':
+            self.augmentation = None
+            transform = A.Compose([
+                A.ShiftScaleRotate(shift_limit=0.5, scale_limit=0.1, rotate_limit=45, always_apply=True, p=1.),
+                A.HueSaturationValue(0.1, 0.4, 0.4, always_apply=True, p=1.),
+                A.Normalize([0.1307, 0.1307, 0.1307], [0.3081, 0.3081, 0.3081], always_apply=True, p=1.),
+                ToTensorV2(always_apply=True, p=1.)
+            ])
+            self.transform = partial(albu_transform, transform=transform)
+
         else:
             raise ValueError(f"Unsupported backend: {augmentation_backend}")
 
@@ -101,6 +111,10 @@ def collate_fn_prefetch(batch, aug):
     return aug(imgs), torch.stack(labels)
 
 
+def albu_transform(image, transform):
+    return transform(image=np.array(image))['image']
+
+
 if __name__ == '__main__':
 
     torch.multiprocessing.set_start_method("spawn")
@@ -115,7 +129,11 @@ if __name__ == '__main__':
 
     dp_gpus = [1, 2, 3, 4]
 
-    backends = ['kornia', 'torchvision']
+    backends = [
+        'albumentations',
+        # 'kornia',
+        # 'torchvision'
+    ]
 
     image_sizes = [(3, 32, 32), (3, 224, 224), (3, 512, 512)]
 
