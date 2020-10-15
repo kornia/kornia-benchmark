@@ -50,7 +50,7 @@ class CoolSystem(pl.LightningModule):
                 K.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.1, p=1.),
                 K.augmentation.Normalize(0.1307, 0.3081),
             )
-            self.transform = lambda x: K.image_to_tensor(np.array(x)).float() / 255.
+            self.transform = kornia_transform
 
         elif augmentation_backend == 'torchvision':
             self.augmentation = None
@@ -113,6 +113,10 @@ def collate_fn_prefetch(batch, aug):
 
 def albu_transform(image, transform):
     return transform(image=np.array(image))['image']
+
+
+def kornia_transform(image):
+    return K.image_to_tensor(np.array(image)).float() / 255.
 
 
 if __name__ == '__main__':
