@@ -11,6 +11,7 @@ from typing import Optional
 from typing import Sequence
 from typing import Tuple
 from typing import Union
+from functools import partial
 import numpy as np
 import torch
 import torch._dynamo as dynamo
@@ -80,6 +81,7 @@ def _iter_op_device() -> Tuple[str, str, str, Tuple[Any]]:
 
 
 def _check_run(
+        verbose: bool,
         module: str,
         operator: str,
         x: Union[Tensor, np.ndarray],
@@ -95,6 +97,13 @@ def _check_run(
             op(x, **kwargs)
         return True
     except Exception as err:
+        if verbose:
+            print('\n\n\n', '-' * 79,
+                        '\033[1;31m'
+                    f'\t\tException on running {module}\n',
+                    err,
+                        '\033[0;0m',
+                    '\n\n\n', '-' * 79,)
         del err
         return False
 
@@ -110,11 +119,40 @@ def _unpack_config_or_load_global(
     return global_data[config_name]
 
 
+def create_ones(
+        shape: Tuple[int, ...],
+        out_t: str,
+        dtype: torch.dtype = torch.float32,
+        device: torch.device = torch.device('cpu'),
+) -> Union[Tensor, np.ndarray]:
+    x_tensor = torch.ones(shape, dtype=dtype, device=device)
+    if out_t == 'tensor':
+        return x_tensor
+
+    x_array: np.ndarray = x_tensor.detach().cpu().numpy()
+    return x_array
+
+def _unpack_config(i):
+    if isinstance(i, dict):
+        if 'ones' in i:
+            # TODO: figure out a way to declare multiple cases. Ex test different kernels
+            if isinstance(i['ones'], list) and len(i['ones']) >= 2:
+                shape = tuple(int(x) for x in i['ones'])
+            elif isinstance(i['ones'], list) and len(i['ones']) == 1:
+                _d = int(i['ones'][0])
+                shape = (_d, _d)
+            return partial(create_ones, shape=shape)
+        else:
+            raise NotImplementedError
+    return i
+
 def dict_product(d):
     # Same as itertools.product but between dict values
     keys = d.keys()
-    for element in product(*d.values()):
-        yield dict(zip(keys, element))
+    prod_cases = [x for x in d.values() if not callable(x)]
+    others =  tuple(x for x in d.values() if callable(x))
+    for element in product(*prod_cases):
+        yield dict(zip(keys, element+others))
 
 
 def load_config(filename: str) -> List[Dict[str, Any]]:
@@ -137,7 +175,7 @@ def load_config(filename: str) -> List[Dict[str, Any]]:
         for k, v in data.items() if k != 'global'
         for lc in dict_product(
             {
-                cn: cv for cn, cv in v.items() if cv not in DEFAULT_CONFIGS
+                cn: _unpack_config(cv) for cn, cv in v.items() if cv not in DEFAULT_CONFIGS
             },
         )
     ]
@@ -156,19 +194,35 @@ def _unpick(filename: str) -> list[Any]:
 
     return results
 
+def _build_kwargs(
+        f_kwargs: Dict[str, Any],
+        out_t: str,
+        dtype: torch.dtype = torch.float32,
+        device: torch.device = torch.device('cpu'),
+):
+    def _unpack_arg(arg,  out_t=out_t, dtype=dtype, device=device):
+        if callable(arg):
+            return arg( out_t=out_t, dtype=dtype, device=device)
+        return arg
+
+    return {
+        k: _unpack_arg(v)
+        for k, v in f_kwargs.items()
+    }
+
 
 def run(
         configs: List[Dict[str, Any]],
         output_filename: str,
+        verbose: bool
 ) -> int:
     with open(output_filename, 'wb') as fp:
         for operator, input_type, device, optimize in _iter_op_device():
             _opt_name, _opt_txt, _opt = optimize
+            _op_dev_txt = f'\033[1;33m {operator} at {device} {_opt_txt}\033[0;0m'
             print(
                 '-'*79,
-                '\n\033[1;33m'
-                f'-> Benchmarking {operator} at {device} {_opt_txt}'
-                '\033[0;0m',
+                f'\n-> Benchmarking{_op_dev_txt}'
             )
 
             for cfg, bs, res in _iter_cfg(configs):
@@ -177,20 +231,22 @@ def run(
                     device=torch.device(device),
                 )
 
-                kwargs = cfg['kwargs']
-
+                kwargs = _build_kwargs(cfg['kwargs'], out_t=input_type, device=torch.device(device))
+                
                 module_name = cfg['module']
                 import_from = f'{cfg["import_from"]}.{module_name}'
 
-                print(
-                    f'\t->Module: {module_name} | Batch size={bs}, '
-                    f'resolution={res}, args={kwargs}',
-                )
-
-                _args_values_str = ', '.join(str(v) for v in kwargs.values())
+                _args_values_str = ', '.join(str(tuple(v.shape)) if hasattr(v, 'shape') else str(v) for v in kwargs.values() )
                 sub_label = f'[{bs}, {res}, {_args_values_str}]'
 
-                if _check_run(import_from, operator, x, _opt, **kwargs):
+                print(
+                    '\n\n\t', '-'*70, '\n'
+                    f'\t->({_op_dev_txt}) Module: {module_name} | Batch size={bs}, '
+                    f'resolution={res}, args={_args_values_str}',
+                )
+
+
+                if _check_run(verbose, import_from, operator, x, _opt, **kwargs):
                     for num_threads in cfg['threads']:
                         print(
                             '\t\t-> benchmarking with '
@@ -198,13 +254,13 @@ def run(
                         )
 
                         desc = f'{_opt_name}{operator.split("_")[0]}_{device}'
-                        stmt = f'{operator}(input, **{kwargs})'
+                        stmt = f'{operator}(input, **kwargs)'
                         setup = f'from {import_from} import {operator}'
 
                         bench_out = benchmark.Timer(
                             stmt=stmt,
                             setup=setup,
-                            globals={'input': x, **kwargs},
+                            globals={'input': x, 'kwargs': kwargs},
                             num_threads=num_threads,
                             label=module_name,
                             sub_label=sub_label,
@@ -244,7 +300,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     parser.add_argument(
         '--config-filename',
-        default='ex_config_run.yaml',
+        default='bench_config.yaml',
         help='Filename for the YAML config for the runner',
     )
     parser.add_argument(
@@ -270,6 +326,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return run(
         configs,
         output_filename=args.output_filename,
+        verbose=args.verbose,
     )
 
 

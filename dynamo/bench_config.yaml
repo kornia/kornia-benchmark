@@ -1,0 +1,59 @@
+global:
+  batch_sizes:
+    [
+      # 1,
+      # 2,
+      # 5,
+      9
+    ]
+  resolutions:
+    [
+      # 32,
+      # 64,
+      # 128,
+      # 256,
+      512
+    ]
+  threads:
+    [
+      # 1,
+      # 4,
+      8
+    ]
+  import_from: 'config'
+
+
+# rescale:
+#   factor:
+#     [
+#       [0.5, 0.5],
+#       [1.5, 1.5]
+#     ]
+
+morphology.dilation:
+  kernel:
+    ones:
+      [9, 9]
+
+
+morphology.erosion:
+  kernel:
+    ones:
+      [9, 9]
+
+morphology.closing:
+  kernel:
+    ones:
+      [9, 9]
+
+
+morphology.gradient:
+  kernel:
+    ones:
+      [9, 9]
+
+
+morphology.top_hat:
+  kernel:
+    ones:
+      [9, 9]

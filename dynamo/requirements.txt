@@ -2,3 +2,4 @@
 # torch[dynamo]
 kornia@git+https://github.com/kornia/kornia
 opencv-python
+PyYAML
