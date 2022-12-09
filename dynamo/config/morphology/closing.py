@@ -8,7 +8,9 @@ kornia_op = kornia.morphology.closing
 
 def opencv_op(
         input: np.ndarray,
-        kernel: np.ndarray
+        kernel: np.ndarray,
+        *args,
+        **kwargs
 ) -> None:
     # simulate batch as sequential op
     input = input.astype(np.uint8)

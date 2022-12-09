@@ -34,26 +34,31 @@ morphology.dilation:
   kernel:
     ones:
       [9, 9]
+  engine: ['unfold', 'convolution']
 
 
 morphology.erosion:
   kernel:
     ones:
       [9, 9]
+  engine: ['unfold', 'convolution']
 
 morphology.closing:
   kernel:
     ones:
       [9, 9]
+  engine: ['unfold', 'convolution']
 
 
 morphology.gradient:
   kernel:
     ones:
       [9, 9]
+  engine: ['unfold', 'convolution']
 
-
+#
 morphology.top_hat:
   kernel:
     ones:
       [9, 9]
+  engine: ['unfold', 'convolution']
