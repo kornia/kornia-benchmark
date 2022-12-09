@@ -23,7 +23,7 @@ global:
   import_from: 'config'
 
 
-# rescale:
+# geometry.transform.rescale:
 #   factor:
 #     [
 #       [0.5, 0.5],
