@@ -3,6 +3,7 @@ import logging
 import pickle
 import sys
 from datetime import datetime
+from functools import partial
 from itertools import product
 from typing import Any
 from typing import Dict
@@ -11,7 +12,7 @@ from typing import Optional
 from typing import Sequence
 from typing import Tuple
 from typing import Union
-from functools import partial
+
 import numpy as np
 import torch
 import torch._dynamo as dynamo
@@ -99,12 +100,12 @@ def _check_run(
     except Exception as err:
         if verbose:
             print(
-                  '\n\n\n', '-' * 79,
-                  '\033[1;31m',
-                  f'\t\tException on running {module}\n',
-                  err,
-                  '\033[0;0m',
-                  '\n\n\n', '-' * 79,
+                '\n\n\n', '-' * 79,
+                '\033[1;31m',
+                f'\t\tException on running {module}\n',
+                err,
+                '\033[0;0m',
+                '\n\n\n', '-' * 79,
             )
         del err
         return False
@@ -182,7 +183,7 @@ def load_config(filename: str) -> List[Dict[str, Any]]:
         for lc in dict_product(
             {
                 cn: _unpack_config(cv) for cn, cv in v.items()
-                if cv not in DEFAULT_CONFIGS
+                if cv not in DEFAULT_CONFIGS and cn != 'no_args'
             },
         )
     ]
@@ -222,16 +223,18 @@ def _build_kwargs(
 def run(
         configs: List[Dict[str, Any]],
         output_filename: str,
-        verbose: bool
+        verbose: bool,
 ) -> int:
     with open(output_filename, 'wb') as fp:
         for operator, input_type, device, optimize in _iter_op_device():
             _opt_name, _opt_txt, _opt = optimize
-            _op_dev_txt = (f'\033[1;33m {operator} at {device} {_opt_txt}'
-                           '\033[0;0m')
+            _op_dev_txt = (
+                f'\033[1;33m {operator} at {device} {_opt_txt}'
+                '\033[0;0m'
+            )
             print(
                 '-'*79,
-                f'\n-> Benchmarking{_op_dev_txt}'
+                f'\n-> Benchmarking{_op_dev_txt}',
             )
 
             for cfg, bs, res in _iter_cfg(configs):
@@ -241,18 +244,18 @@ def run(
                 )
 
                 kwargs = _build_kwargs(
-                                       cfg['kwargs'],
-                                       out_t=input_type,
-                                       device=torch.device(device)
+                    cfg['kwargs'],
+                    out_t=input_type,
+                    device=torch.device(device),
                 )
 
                 module_name = cfg['module']
                 import_from = f'{cfg["import_from"]}.{module_name}'
 
                 _args_values_str = ', '.join(
-                                    str(tuple(v.shape)) if hasattr(v, 'shape')
-                                    else str(v)
-                                    for v in kwargs.values()
+                    str(tuple(v.shape)) if hasattr(v, 'shape')
+                    else str(v)
+                    for v in kwargs.values()
                 )
                 sub_label = f'[{bs}, {res}, {_args_values_str}]'
 
@@ -327,6 +330,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         action='store_true',
         default=False,
     )
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        default=False,
+    )
     _dt = datetime.strftime(datetime.utcnow(), '%Y%m%d_%H%M%S')
     parser.add_argument(
         '--output-filename',
@@ -340,12 +348,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.verbose:
         torch._dynamo.config.verbose = True
+        torch._dynamo.config.log_level = logging.INFO
+    elif args.debug:
+        torch._dynamo.config.verbose = True
         torch._dynamo.config.log_level = logging.DEBUG
 
     return run(
         configs,
         output_filename=args.output_filename,
-        verbose=args.verbose,
+        verbose=args.verbose or args.debug,
     )
 
 

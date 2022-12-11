@@ -61,6 +61,7 @@ This is done a YAML file as example the [bench_config.yaml](./bench_config.yaml)
         - TODO: add others operators as needed
           - `eye` will be necessary for the `geometric.transform.warp_affine`
         - Why have this unique cases? To be able to construct these arguments outside of the operation which is being performed the benchmark
+    - If the operation doesn't need any other argument then the `input` you can use the argument `no_arg: True` at the operation config.
 
 So the config file will look like:
 ```yaml
@@ -88,4 +89,4 @@ $ python runner.py
 
 The arguments of the runner can be checked with the `--help` argument (running with `$python runner.py --help`). Some of the arguments are:
 - `--config-filename` to define the `YAML` config file, by default the runner will look for `./bench_config.yaml`.
-- `--verbose` to turn on the verbose mode of the dynamo.
+- `--verbose` to turn on the verbose mode of the dynamo. Also, have `--debug` to set logger to debug level.
