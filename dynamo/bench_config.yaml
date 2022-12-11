@@ -30,35 +30,52 @@ global:
 #       [1.5, 1.5]
 #     ]
 
-morphology.dilation:
-  kernel:
-    ones:
-      [9, 9]
-  engine: ['unfold', 'convolution']
+# morphology.dilation:
+#   kernel:
+#     ones:
+#       [9, 9]
+#   engine: ['unfold', 'convolution']
 
 
-morphology.erosion:
-  kernel:
-    ones:
-      [9, 9]
-  engine: ['unfold', 'convolution']
+# morphology.erosion:
+#   kernel:
+#     ones:
+#       [9, 9]
+#   engine: ['unfold', 'convolution']
 
-morphology.closing:
-  kernel:
-    ones:
-      [9, 9]
-  engine: ['unfold', 'convolution']
+# morphology.closing:
+#   kernel:
+#     ones:
+#       [9, 9]
+#   engine: ['unfold', 'convolution']
 
 
-morphology.gradient:
-  kernel:
-    ones:
-      [9, 9]
-  engine: ['unfold', 'convolution']
+# morphology.gradient:
+#   kernel:
+#     ones:
+#       [9, 9]
+#   engine: ['unfold', 'convolution']
 
-#
-morphology.top_hat:
-  kernel:
-    ones:
-      [9, 9]
-  engine: ['unfold', 'convolution']
+# #
+# morphology.top_hat:
+#   kernel:
+#     ones:
+#       [9, 9]
+#   engine: ['unfold', 'convolution']
+
+color.multiple:
+  mode:
+    [
+      'bgr_to_rgb',
+      'rgb_to_grayscale',
+      'rgb_to_hls',
+      'rgb_to_hsv',
+      'rgb_to_lab',
+      'rgb_to_luv',
+      'rgb_to_xyz',
+      'rgb_to_ycbcr',
+      'rgb_to_yuv',
+    ]
+
+color.rgb_to_rgba:
+  alpha_val: [1.0]
