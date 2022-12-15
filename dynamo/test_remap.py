@@ -23,7 +23,6 @@ def remap_opencv(image, map_x, map_y, batch_size):
         outs.append(out)
     return np.stack(outs)
 
-
 def remap_kornia_eager_new(image, map_xy):
     return F.grid_sample(image, map_xy, mode="bilinear")
 
@@ -69,7 +68,8 @@ threads = [1, 4, 8]
 # backends = ["eager", "jit", "dynamo"]
 backends = ["eager", "dynamo"]
 versions = ["new", "old"]
-devices = ["cpu", "cuda"]
+devices = ["cpu"]
+#devices = ["cpu", "cuda"]
 dtypes = ["float16", "float32", "float64"]
 
 
