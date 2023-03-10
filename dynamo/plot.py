@@ -27,7 +27,7 @@ def preprocess(df):
 
 
 # Load the results: will be a list of torch Measurement
-results = _unpick('output-benchmark-20230106_173208.pickle')
+results = _unpick('output-benchmark-20230309_235112.pickle')
 
 # Transform into a table
 compare = Compare(results)
@@ -70,10 +70,10 @@ def plot(df, name=''):
         'dynamo_kornia_cpu': {
             'idx': 2, 'new_name': 'dynamo_cpu', 'color': (.99, .8, .898, 1.),
         },
-        'kornia_gpu': {
-            'idx': 3, 'new_name': 'eager_gpu', 'color': (.698, .878, .38, .1),
+        'kornia_cuda': {
+            'idx': 3, 'new_name': 'eager_gpu', 'color': (.698, .878, .38, 1.),
         },
-        'dynamo_kornia_gpu': {
+        'dynamo_kornia_cuda': {
             'idx': 4,  'new_name': 'dynamo_gpu',
             'color': (.741, .494, .745, 1.),
         },
