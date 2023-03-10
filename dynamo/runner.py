@@ -21,6 +21,8 @@ import torch.utils.benchmark as benchmark
 import yaml
 from kornia.core import Tensor
 from yaml.loader import SafeLoader
+from plot import preprocess, plot
+from compare import Compare
 
 
 torch.set_float32_matmul_precision('high')
@@ -339,6 +341,37 @@ def run(
     return 0
 
 
+def generate_graphs(filename: str) -> int:
+    # Load the results: will be a list of torch Measurement
+    results = _unpick(filename)
+
+    # Transform into a table
+    compare = Compare(results)
+    df = compare.join_to_df()
+
+    # Preprocess the df
+    df = preprocess(df)
+
+    # Cast the column types
+    df['has_warnings'] = df['has_warnings'].replace(
+        {'False': False, 'True': True}
+    )
+    df = df.convert_dtypes()
+
+    # Get the module name and the operation itself
+    df['op_name'] = df['op'].apply(lambda x: x.split('.')[-1])
+    df['module'] = df['op'].apply(lambda x: '.'.join(x.split('.')[:-1]))
+
+    # generate a df for each operation
+    df_by_op = df.groupby('op_name')
+
+    # Plot each operation
+    for op_name, frame in df_by_op:
+        plot(frame, op_name, True)
+
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     parser = argparse.ArgumentParser(
@@ -361,6 +394,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         action='store_true',
         default=False,
     )
+    parser.add_argument(
+        '--save-graphs',
+        action='store_true',
+        default=False,
+    )
+
     _dt = datetime.strftime(datetime.utcnow(), '%Y%m%d_%H%M%S')
     parser.add_argument(
         '--output-filename',
@@ -379,11 +418,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         torch._dynamo.config.verbose = True
         torch._dynamo.config.log_level = logging.DEBUG
 
-    return run(
+    sig = run(
         configs,
         output_filename=args.output_filename,
         verbose=args.verbose or args.debug,
     )
+
+    if args.save_graphs:
+        sig = generate_graphs(filename=args.output_filename)
+
+    return sig
 
 
 if __name__ == '__main__':

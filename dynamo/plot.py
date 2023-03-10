@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-from compare import Compare
 from matplotlib.patches import Patch
-from runner import _unpick
+import os
 
 
 def _color_op_names(df):
@@ -26,30 +25,7 @@ def preprocess(df):
     return df
 
 
-# Load the results: will be a list of torch Measurement
-results = _unpick('output-benchmark-20230309_235112.pickle')
-
-# Transform into a table
-compare = Compare(results)
-df = compare.join_to_df()
-
-# Preprocess the df
-df = preprocess(df)
-
-
-# Cast the column types
-df['has_warnings'] = df['has_warnings'].replace({'False': False, 'True': True})
-df = df.convert_dtypes()
-
-# Get the module name and the operation itself
-df['op_name'] = df['op'].apply(lambda x: x.split('.')[-1])
-df['module'] = df['op'].apply(lambda x: '.'.join(x.split('.')[:-1]))
-
-# generate a df for each operation
-df_by_op = df.groupby('op_name')
-
-
-def plot(df, name=''):
+def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
     print(f'Working on plot of {name}...')
 
     if df['has_warnings'].any():
@@ -93,7 +69,7 @@ def plot(df, name=''):
         _df = pd.concat([_df, df_tmp])
 
     _df['time'] = _df['time'].astype(float)
-    time_unit = _df['time_unit'].unique()[0]
+    time_unit = f"time ({_df['time_unit'].unique()[0]})"
 
     _df['label'] = _df['threads'] + ' threads | ' + _df['arguments']
     _df['_seq'] = _df['old_name'].apply(lambda x: _map[x]['idx'])
@@ -101,15 +77,15 @@ def plot(df, name=''):
     _df = _df.sort_values(['label', '_seq'])
 
     # Create graph
-    ax = _df.plot.bar(
+    ax = _df.plot.barh(
         x='label',
         y='time',
         color=_df['color'].values.tolist(),
         legend=True,
         title=name,
-        ylabel=time_unit,
-        xlabel='arguments',
-        logy=True,
+        xlabel=time_unit,
+        ylabel='arguments',
+        logx=True,
     )
 
     # Create legend
@@ -127,11 +103,16 @@ def plot(df, name=''):
 
     # Config plot
     plt.xticks(rotation=45)
+    plt.tick_params(axis='y', labelsize=8)
 
     # show or save
-    plt.show()
-
-
-# Plot each operation
-for op_name, frame in df_by_op:
-    plot(frame, op_name)
+    if save:
+        os.makedirs(outdir, exist_ok=True)
+        plt.tight_layout()
+        plt.savefig(
+            os.path.join(outdir, f'{name}.png'),
+            dpi=600,
+            bbox_inches='tight',
+        )
+    else:
+        plt.show()
