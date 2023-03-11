@@ -7,6 +7,25 @@ from compare import Compare
 plt.rcParams['figure.autolayout'] = True
 plt.rcParams['font.size'] = 10.0
 
+_MAP = {
+    'opencv_cpu': {
+        'idx': 0, 'new_name': 'opencv', 'color': (.627, .627, .627, 1.),
+    },
+    'kornia_cpu': {
+        'idx': 1, 'new_name': 'eager_cpu', 'color': (.745, .725, .859, 1.),
+    },
+    'dynamo_kornia_cpu': {
+        'idx': 2, 'new_name': 'dynamo_cpu', 'color': (.99, .8, .898, 1.),
+    },
+    'kornia_cuda': {
+        'idx': 3, 'new_name': 'eager_gpu', 'color': (.698, .878, .38, 1.),
+    },
+    'dynamo_kornia_cuda': {
+        'idx': 4,  'new_name': 'dynamo_gpu',
+        'color': (.741, .494, .745, 1.),
+    },
+}
+
 
 def _color_op_names(df):
     def _update_name(row):
@@ -141,43 +160,23 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
             '\033[0;0m',
         )
 
-    _map = {
-        'opencv_cpu': {
-            'idx': 0, 'new_name': 'opencv', 'color': (.627, .627, .627, 1.),
-        },
-        'kornia_cpu': {
-            'idx': 1, 'new_name': 'eager_cpu', 'color': (.745, .725, .859, 1.),
-        },
-        'dynamo_kornia_cpu': {
-            'idx': 2, 'new_name': 'dynamo_cpu', 'color': (.99, .8, .898, 1.),
-        },
-        'kornia_cuda': {
-            'idx': 3, 'new_name': 'eager_gpu', 'color': (.698, .878, .38, 1.),
-        },
-        'dynamo_kornia_cuda': {
-            'idx': 4,  'new_name': 'dynamo_gpu',
-            'color': (.741, .494, .745, 1.),
-        },
-    }
-
-    cols = [x for x in df.columns if x not in _map.keys()]
-
     # Join time into a unique serie
+    cols = [x for x in df.columns if x not in _MAP.keys()]
     _df = pd.DataFrame(columns=cols+['time', 'optimizer'])
-    for k, v in _map.items():
+    for k, v in _MAP.items():
         if k not in df.columns:
             continue
         df_tmp = df[cols + [k]]
         df_tmp = df_tmp.rename({k: 'time'}, axis='columns')
         df_tmp['optimizer'] = k
         _df = pd.concat([_df, df_tmp])
-
     _df['time'] = _df['time'].astype(float)
-    time_unit = _df['time_unit'].unique()[0]
 
+    # Config arguments label
     _df['label'] = _df['threads'] + ' threads\n' + _df['arguments']
     _df['label'] = _df['label'].astype('category')
 
+    # Generate cross table
     df_pivot = pd.pivot_table(
         _df,
         values='time',
@@ -185,17 +184,16 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
         columns='optimizer',
         fill_value=0.,
     )
-
     df_pivot = df_pivot.sort_values(by=['label'], ascending=False)
-
     cols = df_pivot.columns.tolist()
-    cols.sort(key=lambda x: _map[x]['idx'])
+    cols.sort(key=lambda x: _MAP[x]['idx'])
     df_pivot = df_pivot.reindex(cols, axis='columns')
-    df_pivot = df_pivot.rename(columns={c: _map[c]['new_name'] for c in cols})
+    df_pivot = df_pivot.rename(columns={c: _MAP[c]['new_name'] for c in cols})
 
     print(df_pivot.to_string())
 
-    colors = [m['color'] for m in _map.values()]
+    time_unit = _df['time_unit'].unique()[0]
+    colors = [m['color'] for m in _MAP.values()]
 
     # Time graph
     _ = _plot_time_graph(df_pivot, colors, name, time_unit)
@@ -241,7 +239,6 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
 
 
 def graphs_from_results(results) -> None:
-
     # Transform into a table
     compare = Compare(results)
     df = compare.join_to_df()
