@@ -87,6 +87,11 @@ With all the experiments desired configured in the `YAML` file you can run the r
 $ python runner.py
 ```
 
-The arguments of the runner can be checked with the `--help` argument (running with `$python runner.py --help`). Some of the arguments are:
-- `--config-filename` to define the `YAML` config file, by default the runner will look for `./bench_config.yaml`.
-- `--verbose` to turn on the verbose mode of the dynamo. Also, have `--debug` to set logger to debug level.
+The arguments of the runner can be checked with the `--help` argument (running
+with `$python runner.py --help`). Some of the arguments are:
+- `--config-filename` to define the `YAML` config file, by default the runner
+will look for `./bench_config.yaml`.
+- `--verbose` to turn on the verbose mode of the dynamo. Also, have `--debug`
+to set logger to debug level.
+- `--save-graphs` generate a graph for each operation comparing the benchmarks.
+The graphs will be saved under the directory [out_graphs/]('./out_graphs/').

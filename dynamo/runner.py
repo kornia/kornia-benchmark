@@ -398,6 +398,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--save-graphs',
         action='store_true',
         default=False,
+        help=('From the benchmark file, generate a graph for each operation'
+              'comparing the benchmarks.')
     )
 
     _dt = datetime.strftime(datetime.utcnow(), '%Y%m%d_%H%M%S')
