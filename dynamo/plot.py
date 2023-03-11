@@ -176,7 +176,6 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
     time_unit = _df['time_unit'].unique()[0]
 
     _df['label'] = _df['threads'] + ' threads\n' + _df['arguments']
-
     _df['label'] = _df['label'].astype('category')
 
     df_pivot = pd.pivot_table(

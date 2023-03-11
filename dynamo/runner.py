@@ -342,10 +342,7 @@ def run(
 
 def generate_graphs(filename: str) -> int:
     # Load the results: will be a list of torch Measurement
-    results = _unpick(filename)
-
-    graphs_from_results(results)
-
+    graphs_from_results(_unpick(filename))
     return 0
 
 
@@ -409,7 +406,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         sig = generate_graphs(filename=args.output_filename)
 
     return sig
-
 
 if __name__ == '__main__':
     raise SystemExit(main())
