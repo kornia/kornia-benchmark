@@ -37,7 +37,7 @@ To maintain the sanity of this repository, we can maintain the same dir structur
 
 ### Config the benchmark run
 
-This is done a YAML file as example the [bench_config.yaml](./bench_config.yaml). This file is where the benchmark experiments are defined. First, we have a `global` level, and subsequently the config for each operation itself.
+This is done by a YAML file as example the [bench_config.yaml](./bench_config.yaml). This file is where the benchmark experiments are defined. First, we have a `global` level, and subsequently the config for each operation itself.
 
 - The global level needs to have (as sublevels):
   1. `batch_sizes` a list of batch_sizes (integer) wanted to be tested in the benchmarks.
@@ -46,7 +46,7 @@ This is done a YAML file as example the [bench_config.yaml](./bench_config.yaml)
   1. `import_from` a string with the name of the top level directory with the desired benchmarks. Here, is the  [config/](./config/) directory.
 
 - Subsequently we can add the operations wanted to be bench with their specific arguments.
-  - The name of the operation should match with the relative path under the top level directory. For example, to config a `dilation` bench, which is in [config/geometry/transform/rescale.py](./config/geometry/transform/rescale.py) we will add the name of op as `geometry.transform.rescale`.
+  - The name of the operation should match with the relative path under the top level directory. For example, to config a `rescale` bench, which is in [config/geometry/transform/rescale.py](./config/geometry/transform/rescale.py) we will add the name of op as `geometry.transform.rescale`.
   - Here we can overwrite the `global` configs if necessary.
   - inside of the level of the operation we can add the arguments which will be dispatch to the operation itself.
     - Normal cases we can pass direct the desired argument, as example for rescale we want to pass the `factor` argument. Then we create a list of cases (for rescale a list of integer) to be done the benchmark.
