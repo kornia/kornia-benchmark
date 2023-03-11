@@ -1,7 +1,11 @@
+import os
+
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.patches import Patch
-import os
+from compare import Compare
+
+plt.rcParams['figure.autolayout'] = True
+plt.rcParams['font.size'] = 10.0
 
 
 def _color_op_names(df):
@@ -58,52 +62,64 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
     cols = [x for x in df.columns if x not in _map.keys()]
 
     # Join time into a unique serie
-    _df = pd.DataFrame(columns=cols+['optimizer', 'time', 'old_name'])
+    _df = pd.DataFrame(columns=cols+['time', 'optimizer'])
     for k, v in _map.items():
         if k not in df.columns:
             continue
         df_tmp = df[cols + [k]]
         df_tmp = df_tmp.rename({k: 'time'}, axis='columns')
-        df_tmp['optimizer'] = v['new_name']
-        df_tmp['old_name'] = k
+        df_tmp['optimizer'] = k
         _df = pd.concat([_df, df_tmp])
 
     _df['time'] = _df['time'].astype(float)
     time_unit = f"time ({_df['time_unit'].unique()[0]})"
 
-    _df['label'] = _df['threads'] + ' threads | ' + _df['arguments']
-    _df['_seq'] = _df['old_name'].apply(lambda x: _map[x]['idx'])
-    _df['color'] = _df['old_name'].apply(lambda x: _map[x]['color'])
-    _df = _df.sort_values(['label', '_seq'])
+    _df['label'] = _df['threads'] + ' threads\n' + _df['arguments']
 
-    # Create graph
-    ax = _df.plot.barh(
-        x='label',
-        y='time',
-        color=_df['color'].values.tolist(),
-        legend=True,
-        title=name,
-        xlabel=time_unit,
-        ylabel='arguments',
-        logx=True,
+    _df['label'] = _df['label'].astype('category')
+
+    df_pivot = pd.pivot_table(
+        _df,
+        values='time',
+        index='label',
+        columns='optimizer',
+        fill_value=0.,
     )
 
-    # Create legend
-    handles = []
-    _as = []
-    for _, row in _df.iterrows():
-        if row['optimizer'] in _as:
-            continue
-        handles.append(Patch(facecolor=row['color'], label=row['optimizer']))
-        _as.append(row['optimizer'])
-    ax.legend(handles=handles)
+    df_pivot = df_pivot.sort_values(by=['label'], ascending=False)
+
+    cols = df_pivot.columns.tolist()
+    cols.sort(key=lambda x: _map[x]['idx'])
+    df_pivot = df_pivot.reindex(cols, axis='columns')
+    df_pivot = df_pivot.rename(columns={c: _map[c]['new_name'] for c in cols})
+
+    print(df_pivot.to_string())
+
+    # Create graph
+    ax = df_pivot.plot.barh(
+        color=[m['color'] for m in _map.values()],
+        legend=True,
+        title=name,
+        width=0.8,
+        align='center',
+        logx=True,
+    )
+    ax.invert_yaxis()
+
+    # Config legend
+    ax.legend(fontsize='xx-small')
 
     # Add labels to bars
-    ax.bar_label(ax.containers[0])
+    for container in ax.containers:
+        ax.bar_label(container, fontsize=5, padding=6, fmt='%.1f')
 
     # Config plot
-    plt.xticks(rotation=45)
-    plt.tick_params(axis='y', labelsize=8)
+    plt.xlabel(time_unit, fontsize='x-small')
+    plt.ylabel('Argunments', fontsize='x-small')
+    plt.xticks(rotation=45, fontsize='xx-small')
+    plt.yticks(fontsize='xx-small')
+
+    plt.tick_params(axis='y', which='major')
 
     # show or save
     if save:
@@ -116,3 +132,30 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
         )
     else:
         plt.show()
+
+
+def graphs_from_results(results) -> None:
+
+    # Transform into a table
+    compare = Compare(results)
+    df = compare.join_to_df()
+
+    # Preprocess the df
+    df = preprocess(df)
+
+    # Cast the column types
+    df['has_warnings'] = df['has_warnings'].replace(
+        {'False': False, 'True': True},
+    )
+    df = df.convert_dtypes()
+
+    # Get the module name and the operation itself
+    df['op_name'] = df['op'].apply(lambda x: x.split('.')[-1])
+    df['module'] = df['op'].apply(lambda x: '.'.join(x.split('.')[:-1]))
+
+    # generate a df for each operation
+    df_by_op = df.groupby('op_name')
+
+    # Plot each operation
+    for op_name, frame in df_by_op:
+        plot(frame, op_name, True)

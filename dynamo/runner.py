@@ -20,9 +20,8 @@ import torch._dynamo as dynamo
 import torch.utils.benchmark as benchmark
 import yaml
 from kornia.core import Tensor
+from plot import graphs_from_results
 from yaml.loader import SafeLoader
-from plot import preprocess, plot
-from compare import Compare
 
 
 torch.set_float32_matmul_precision('high')
@@ -345,29 +344,7 @@ def generate_graphs(filename: str) -> int:
     # Load the results: will be a list of torch Measurement
     results = _unpick(filename)
 
-    # Transform into a table
-    compare = Compare(results)
-    df = compare.join_to_df()
-
-    # Preprocess the df
-    df = preprocess(df)
-
-    # Cast the column types
-    df['has_warnings'] = df['has_warnings'].replace(
-        {'False': False, 'True': True}
-    )
-    df = df.convert_dtypes()
-
-    # Get the module name and the operation itself
-    df['op_name'] = df['op'].apply(lambda x: x.split('.')[-1])
-    df['module'] = df['op'].apply(lambda x: '.'.join(x.split('.')[:-1]))
-
-    # generate a df for each operation
-    df_by_op = df.groupby('op_name')
-
-    # Plot each operation
-    for op_name, frame in df_by_op:
-        plot(frame, op_name, True)
+    graphs_from_results(results)
 
     return 0
 
@@ -398,8 +375,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--save-graphs',
         action='store_true',
         default=False,
-        help=('From the benchmark file, generate a graph for each operation'
-              'comparing the benchmarks.')
+        help=(
+            'From the benchmark file, generate a graph for each operation'
+            'comparing the benchmarks.'
+        ),
     )
 
     _dt = datetime.strftime(datetime.utcnow(), '%Y%m%d_%H%M%S')
