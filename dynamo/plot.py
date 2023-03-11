@@ -29,6 +29,18 @@ def preprocess(df):
     return df
 
 
+def _format_time(value: float | str, unit: str) -> str:
+    if unit == 'us':
+        if value > 1e5:
+            value = value / 1e6
+            unit = 's'
+        elif value > 1e2:
+            value = value/1e3
+            unit = 'ms'
+
+    return f'{value:.2f} {unit}'
+
+
 def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
     print(f'Working on plot of {name}...')
 
@@ -72,7 +84,7 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
         _df = pd.concat([_df, df_tmp])
 
     _df['time'] = _df['time'].astype(float)
-    time_unit = f"time ({_df['time_unit'].unique()[0]})"
+    time_unit = _df['time_unit'].unique()[0]
 
     _df['label'] = _df['threads'] + ' threads\n' + _df['arguments']
 
@@ -105,16 +117,21 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
         logx=True,
     )
     ax.invert_yaxis()
+    ax.margins(0.1)
 
     # Config legend
     ax.legend(fontsize='xx-small')
 
     # Add labels to bars
     for container in ax.containers:
-        ax.bar_label(container, fontsize=5, padding=6, fmt='%.1f')
+        labels = [
+            _format_time(float(v), time_unit)
+            for v in container.datavalues
+        ]
+        ax.bar_label(container, labels=labels, fontsize=5, padding=6)
 
     # Config plot
-    plt.xlabel(time_unit, fontsize='x-small')
+    plt.xlabel(f'Time ({time_unit})', fontsize='x-small')
     plt.ylabel('Argunments', fontsize='x-small')
     plt.xticks(rotation=45, fontsize='xx-small')
     plt.yticks(fontsize='xx-small')
