@@ -41,6 +41,95 @@ def _format_time(value: float | str, unit: str) -> str:
     return f'{value:.2f} {unit}'
 
 
+def _show_or_save(
+    save: bool = False, outdir: str = './', name: str = 'graph.png',
+) -> None:
+    if save:
+        os.makedirs(outdir, exist_ok=True)
+        plt.tight_layout()
+        plt.savefig(
+            os.path.join(outdir, name),
+            dpi=600,
+            bbox_inches='tight',
+        )
+        return
+
+    plt.show()
+
+
+def _plot_time_graph(
+    df: pd.DataFrame,
+    colors: list[tuple[float, ...]],
+    name: str = 'My graph',
+    time_unit: str = '',
+) -> plt.Axes:
+    ax = df.plot.barh(
+        color=colors,
+        legend=True,
+        title=name,
+        width=0.8,
+        align='center',
+        logx=True,
+    )
+    ax.invert_yaxis()
+    ax.margins(0.1)
+
+    # Config legend
+    ax.legend(fontsize='xx-small')
+
+    # Add labels to bars
+    for container in ax.containers:
+        labels = [
+            _format_time(float(v), time_unit)
+            for v in container.datavalues
+        ]
+        ax.bar_label(container, labels=labels, fontsize=5, padding=6)
+
+    # Config plot
+    plt.xlabel(f'Time ({time_unit})', fontsize='x-small')
+    plt.ylabel('Argunments', fontsize='x-small')
+    plt.xticks(rotation=45, fontsize='xx-small')
+    plt.yticks(fontsize='xx-small')
+    plt.tick_params(axis='y', which='major')
+
+    return ax
+
+
+def _plot_ratio_graph(
+    df: pd.DataFrame,
+    colors: list[tuple[float, ...]],
+    name: str = 'My ratio graph',
+) -> plt.Axes:
+    ax = df.plot.barh(
+        color=colors,
+        legend=True,
+        width=0.8,
+        align='center',
+    )
+    ax.invert_yaxis()
+    ax.margins(0.1)
+
+    # Config legend
+    ax.legend(fontsize='xx-small')
+
+    # Add labels to bars
+    for container in ax.containers:
+        labels = [
+            f'{(float(v)):.3f}x' if float(v) < 1 else f'{(float(v)):.1f}x'
+            for v in container.datavalues
+        ]
+        ax.bar_label(container, labels=labels, fontsize=5, padding=6)
+
+    # Config plot
+    plt.ylabel('Argunments', fontsize='x-small')
+    plt.xticks(rotation=45, fontsize='xx-small')
+    plt.yticks(fontsize='xx-small')
+    plt.title(name)
+    plt.tick_params(axis='y', which='major')
+
+    return ax
+
+
 def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
     print(f'Working on plot of {name}...')
 
@@ -107,48 +196,49 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
 
     print(df_pivot.to_string())
 
-    # Create graph
-    ax = df_pivot.plot.barh(
-        color=[m['color'] for m in _map.values()],
-        legend=True,
-        title=name,
-        width=0.8,
-        align='center',
-        logx=True,
+    colors = [m['color'] for m in _map.values()]
+
+    # Time graph
+    _ = _plot_time_graph(df_pivot, colors, name, time_unit)
+    _show_or_save(save, outdir, f'{name}.png')
+
+    # Ratio by opencv
+    _n = df_pivot['opencv']
+    df_ratio_cv2 = df_pivot.drop(columns=['opencv'])
+    for c in df_ratio_cv2.columns:
+        df_ratio_cv2[c] = _n / df_ratio_cv2[c]
+
+    _ = _plot_ratio_graph(df_ratio_cv2, colors[1:], name)
+    plt.xlabel('times faster than OpenCV', fontsize='x-small')
+    _show_or_save(save, outdir, f'{name}_ratio.png')
+
+    # Ratio between cpu ops
+    _n = df_pivot['eager_cpu']
+    df_ratio_cpu = df_pivot.drop(
+        columns=[
+            'eager_cpu', 'eager_gpu', 'dynamo_gpu',
+        ],
     )
-    ax.invert_yaxis()
-    ax.margins(0.1)
+    for c in df_ratio_cpu.columns:
+        df_ratio_cpu[c] = _n / df_ratio_cpu[c]
 
-    # Config legend
-    ax.legend(fontsize='xx-small')
+    _ = _plot_ratio_graph(df_ratio_cpu, colors[1:], name)
+    plt.xlabel('times faster than eager Kornia on CPU', fontsize='x-small')
+    _show_or_save(save, outdir, f'{name}_ratio_cpu.png')
 
-    # Add labels to bars
-    for container in ax.containers:
-        labels = [
-            _format_time(float(v), time_unit)
-            for v in container.datavalues
-        ]
-        ax.bar_label(container, labels=labels, fontsize=5, padding=6)
+    # Ratio between gpu ops
+    _n = df_pivot['eager_gpu']
+    df_ratio_gpu = df_pivot.drop(
+        columns=[
+            'eager_gpu', 'eager_cpu', 'dynamo_cpu',
+        ],
+    )
+    for c in df_ratio_gpu.columns:
+        df_ratio_gpu[c] = _n / df_ratio_gpu[c]
 
-    # Config plot
-    plt.xlabel(f'Time ({time_unit})', fontsize='x-small')
-    plt.ylabel('Argunments', fontsize='x-small')
-    plt.xticks(rotation=45, fontsize='xx-small')
-    plt.yticks(fontsize='xx-small')
-
-    plt.tick_params(axis='y', which='major')
-
-    # show or save
-    if save:
-        os.makedirs(outdir, exist_ok=True)
-        plt.tight_layout()
-        plt.savefig(
-            os.path.join(outdir, f'{name}.png'),
-            dpi=600,
-            bbox_inches='tight',
-        )
-    else:
-        plt.show()
+    _ = _plot_ratio_graph(df_ratio_gpu, colors[-2:], name)
+    plt.xlabel('times faster than eager Kornia on GPU', fontsize='x-small')
+    _show_or_save(save, outdir, f'{name}_ratio_gpu.png')
 
 
 def graphs_from_results(results) -> None:
