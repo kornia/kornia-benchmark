@@ -2,6 +2,7 @@
 # torch[dynamo]
 kornia@git+https://github.com/kornia/kornia
 matplotlib
+opencv-contrib-python
 opencv-python
 pandas
 PyYAML

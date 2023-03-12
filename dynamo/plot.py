@@ -83,6 +83,7 @@ def _plot_time_graph(
     name: str = 'My graph',
     time_unit: str = '',
 ) -> plt.Axes:
+    h_fig = max(len(df)/2, 10.)
     ax = df.plot.barh(
         color=colors,
         legend=True,
@@ -90,6 +91,8 @@ def _plot_time_graph(
         width=0.8,
         align='center',
         logx=True,
+        figsize=(10.0, h_fig),
+
     )
     ax.invert_yaxis()
     ax.margins(0.1)
@@ -120,11 +123,13 @@ def _plot_ratio_graph(
     colors: list[tuple[float, ...]],
     name: str = 'My ratio graph',
 ) -> plt.Axes:
+    h_fig = max(len(df)/2, 10.)
     ax = df.plot.barh(
         color=colors,
         legend=True,
         width=0.8,
         align='center',
+        figsize=(10.0, h_fig),
     )
     ax.invert_yaxis()
     ax.margins(0.1)
