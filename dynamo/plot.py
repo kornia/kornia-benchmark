@@ -6,9 +6,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from compare import Compare
 
-plt.rcParams['figure.autolayout'] = True
-plt.rcParams['font.size'] = 10.0
-
 _MAP = {
     'opencv_cpu': {
         'idx': 0, 'new_name': 'opencv', 'color': (.627, .627, .627, 1.),
@@ -34,6 +31,10 @@ def _color_op_names(df):
         if row['op'] == 'color.multiple':
             args = row['arguments'][1:-1].split(',')
             row['op'] = 'color.' + args[-1].lstrip()
+            row['arguments'] = '[' + ','.join(args[:-1]) + ']'
+        elif row['op'] == 'augmentation.multiple':
+            args = row['arguments'][1:-1].split(',')
+            row['op'] = 'augmentation.' + args[-1].lstrip()
             row['arguments'] = '[' + ','.join(args[:-1]) + ']'
         return row
 
@@ -111,8 +112,8 @@ def _plot_time_graph(
 
     # Config plot
     plt.xlabel(f'Time ({time_unit})', fontsize='x-small')
-    plt.ylabel('Argunments', fontsize='x-small')
-    plt.xticks(rotation=45, fontsize='xx-small')
+    plt.ylabel('Arguments', fontsize='x-small')
+    plt.xticks(fontsize='xx-small')
     plt.yticks(fontsize='xx-small')
     plt.tick_params(axis='y', which='major')
 
@@ -147,7 +148,7 @@ def _plot_ratio_graph(
         ax.bar_label(container, labels=labels, fontsize=5, padding=6)
 
     # Config plot
-    plt.ylabel('Argunments', fontsize='x-small')
+    plt.ylabel('Arguments', fontsize='x-small')
     plt.xticks(rotation=45, fontsize='xx-small')
     plt.yticks(fontsize='xx-small')
     plt.title(name)
@@ -157,8 +158,10 @@ def _plot_ratio_graph(
 
 
 def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
-    print(f'Working on plot of {name}...')
+    plt.rcParams['figure.autolayout'] = True
+    plt.rcParams['font.size'] = 10.0
 
+    print(f'Working on plot of {name}...')
     if df['has_warnings'].any():
         print(
             '\033[1;33m'
@@ -200,49 +203,56 @@ def plot(df, name='', save: bool = False, outdir: str = 'out_graphs/'):
     print(df_pivot.to_string())
 
     time_unit = _df['time_unit'].unique()[0]
-    colors = [m['color'] for m in _MAP.values()]
+    colors = [
+        m['color'] for m in _MAP.values()
+        if m['new_name'] in df_pivot.columns
+    ]
 
     # Time graph
     _ = _plot_time_graph(df_pivot, colors, name, time_unit)
     _show_or_save(save, outdir, f'{name}.png')
 
     # Ratio by opencv
-    _n = df_pivot['opencv']
-    df_ratio_cv2 = df_pivot.drop(columns=['opencv'])
-    for c in df_ratio_cv2.columns:
-        df_ratio_cv2[c] = _n / df_ratio_cv2[c]
+    if 'opencv' in df_pivot.columns:
+        _n = df_pivot['opencv']
+        df_ratio_cv2 = df_pivot.drop(columns=['opencv'])
+        for c in df_ratio_cv2.columns:
+            df_ratio_cv2[c] = _n / df_ratio_cv2[c]
 
-    _ = _plot_ratio_graph(df_ratio_cv2, colors[1:], name)
-    plt.xlabel('times faster than OpenCV', fontsize='x-small')
-    _show_or_save(save, outdir, f'{name}_ratio.png')
+        _ = _plot_ratio_graph(df_ratio_cv2, colors[1:], name)
+        plt.xlabel('times faster than OpenCV', fontsize='x-small')
+        _show_or_save(save, outdir, f'{name}_ratio.png')
 
     # Ratio between cpu ops
-    _n = df_pivot['eager_cpu']
-    df_ratio_cpu = df_pivot.drop(
-        columns=[
-            'eager_cpu', 'eager_gpu', 'dynamo_gpu',
-        ],
-    )
-    for c in df_ratio_cpu.columns:
-        df_ratio_cpu[c] = _n / df_ratio_cpu[c]
+    if 'eager_cpu' in df_pivot.columns:
+        _n = df_pivot['eager_cpu']
+        df_ratio_cpu = df_pivot.drop(
+            columns=[
+                'eager_cpu', 'eager_gpu', 'dynamo_gpu',
+            ],
+        )
+        for c in df_ratio_cpu.columns:
+            df_ratio_cpu[c] = _n / df_ratio_cpu[c]
 
-    _ = _plot_ratio_graph(df_ratio_cpu, colors[1:], name)
-    plt.xlabel('times faster than eager Kornia on CPU', fontsize='x-small')
-    _show_or_save(save, outdir, f'{name}_ratio_cpu.png')
+        _ = _plot_ratio_graph(df_ratio_cpu, colors[1:], name)
+        plt.xlabel('times faster than eager Kornia on CPU', fontsize='x-small')
+        _show_or_save(save, outdir, f'{name}_ratio_cpu.png')
 
     # Ratio between gpu ops
-    _n = df_pivot['eager_gpu']
-    df_ratio_gpu = df_pivot.drop(
-        columns=[
-            'eager_gpu', 'eager_cpu', 'dynamo_cpu',
-        ],
-    )
-    for c in df_ratio_gpu.columns:
-        df_ratio_gpu[c] = _n / df_ratio_gpu[c]
+    if 'eager_gpu' in df_pivot.columns:
+        _n = df_pivot['eager_gpu']
+        df_ratio_gpu = df_pivot.drop(
+            columns=[
+                'eager_gpu', 'eager_cpu', 'dynamo_cpu',
+            ],
+        )
+        for c in df_ratio_gpu.columns:
+            df_ratio_gpu[c] = _n / df_ratio_gpu[c]
 
-    _ = _plot_ratio_graph(df_ratio_gpu, colors[-2:], name)
-    plt.xlabel('times faster than eager Kornia on GPU', fontsize='x-small')
-    _show_or_save(save, outdir, f'{name}_ratio_gpu.png')
+        _ = _plot_ratio_graph(df_ratio_gpu, colors[-2:], name)
+        plt.xlabel('times faster than eager Kornia on GPU', fontsize='x-small')
+        _show_or_save(save, outdir, f'{name}_ratio_gpu.png')
+    plt.close('all')
 
 
 def graphs_from_results(results) -> None:
