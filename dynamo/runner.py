@@ -6,6 +6,7 @@ from datetime import datetime
 from functools import partial
 from itertools import product
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -24,6 +25,30 @@ from yaml.loader import SafeLoader
 
 torch.set_float32_matmul_precision('high')
 torch_dynamo_optimize = dynamo.optimize('inductor')
+
+
+def not_implemented_op(*args, **kwargs) -> None:
+    raise NotImplementedError(
+        'Some error when setting the operation occurs.'
+        'Default not implemented function called!',
+    )
+
+
+def _load_operator(
+    module: str, operator: str, optimizer: Any,
+) -> Callable[..., Any]:
+    module = __import__(module, fromlist=[None])
+    op = getattr(module, operator)
+    if optimizer:
+        return optimizer(op)
+
+    return op
+
+
+def set_op_to_bench(module: str, operator: str, optimizer: Any) -> None:
+    global op_to_bench
+    op_to_bench = not_implemented_op
+    op_to_bench = _load_operator(module, operator, optimizer)
 
 
 def create_inputs(
@@ -90,12 +115,8 @@ def _check_run(
         **kwargs: Dict[str, Any]
 ) -> bool:
     try:
-        module = __import__(module, fromlist=[None])
-        op = getattr(module, operator)
-        if optimizer:
-            optimizer(op)(x, **kwargs)
-        else:
-            op(x, **kwargs)
+        op = _load_operator(module, operator, optimizer)
+        op(x, **kwargs)
         return True
     except Exception as err:
         if verbose:
@@ -227,9 +248,9 @@ def run(
 ) -> int:
     with open(output_filename, 'wb') as fp:
         for operator, input_type, device, optimize in _iter_op_device():
-            _opt_name, _opt_txt, _opt = optimize
+            optz_name, optimizer_txt, optimizer = optimize
             _op_dev_txt = (
-                f'\033[1;33m {operator} at {device} {_opt_txt}'
+                f'\033[1;33m {operator} at {device} {optimizer_txt}'
                 '\033[0;0m'
             )
             print(
@@ -250,7 +271,7 @@ def run(
                 )
 
                 module_name = cfg['module']
-                import_from = f'{cfg["import_from"]}.{module_name}'
+                module = f'{cfg["import_from"]}.{module_name}'
 
                 _args_values_str = ', '.join(
                     str(tuple(v.shape)) if hasattr(v, 'shape')
@@ -267,22 +288,27 @@ def run(
                 )
 
                 if _check_run(
-                        verbose, import_from, operator, x, _opt, **kwargs
+                        verbose, module, operator, x, optimizer, **kwargs
                 ):
+                    # Load the operation on the scope of this file and
+                    # optimize if is the case
+                    set_op_to_bench(module, operator, optimizer)
+
                     for num_threads in cfg['threads']:
                         print(
                             '\t\t-> benchmarking with '
                             f'num_threads={num_threads}...',
                         )
 
-                        desc = f'{_opt_name}{operator.split("_")[0]}_{device}'
-                        stmt = f'{operator}(input, **kwargs)'
-                        setup = f'from {import_from} import {operator}'
+                        desc = f'{optz_name}{operator.split("_")[0]}_{device}'
+                        setup = 'from __main__ import op_to_bench'
+                        stmt = 'op_to_bench(input, **kwargs)'
+                        values = {'input': x, 'kwargs': kwargs}
 
                         bench_out = benchmark.Timer(
                             stmt=stmt,
                             setup=setup,
-                            globals={'input': x, 'kwargs': kwargs},
+                            globals=values,
                             num_threads=num_threads,
                             label=module_name,
                             sub_label=sub_label,
