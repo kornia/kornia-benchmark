@@ -5,7 +5,6 @@ import numpy as np
 kornia_op = kornia.morphology.closing
 
 
-
 def opencv_op(
         input: np.ndarray,
         kernel: np.ndarray,
@@ -13,7 +12,6 @@ def opencv_op(
         **kwargs
 ) -> None:
     # simulate batch as sequential op
-    input = input.astype(np.uint8)
     kernel = kernel.astype(np.uint8)
     if len(input.shape) == 3:
         input = input[None]
