@@ -1,24 +1,24 @@
 global:
   batch_sizes:
     [
-      # 1,
+      1,
       # 2,
-      # 5,
-      9
+      5,
+      # 9
     ]
   resolutions:
     [
       # 32,
       # 64,
-      # 128,
-      # 256,
-      512
+      128,
+      256,
+      # 512
     ]
   threads:
     [
-      # 1,
+      1,
       # 4,
-      8
+      # 8
     ]
   import_from: 'config'
 
@@ -29,14 +29,14 @@ global:
 #       [0.5, 0.5],
 #       [1.5, 1.5]
 #     ]
-
+#
 # morphology.dilation:
 #   kernel:
 #     ones:
 #       [9, 9]
 #   engine: ['unfold', 'convolution']
-
-
+#
+#
 # morphology.erosion:
 #   kernel:
 #     ones:
@@ -48,34 +48,85 @@ global:
 #     ones:
 #       [9, 9]
 #   engine: ['unfold', 'convolution']
-
-
+#
+#
 # morphology.gradient:
 #   kernel:
 #     ones:
 #       [9, 9]
 #   engine: ['unfold', 'convolution']
-
+#
 # #
 # morphology.top_hat:
 #   kernel:
 #     ones:
 #       [9, 9]
 #   engine: ['unfold', 'convolution']
+#
+# color.multiple:
+#   mode:
+#     [
+#       'bgr_to_rgb',
+#       'rgb_to_grayscale',
+#       'rgb_to_hls',
+#       'rgb_to_hsv',
+#       'rgb_to_lab',
+#       'rgb_to_luv',
+#       'rgb_to_xyz',
+#       'rgb_to_ycbcr',
+#       'rgb_to_yuv',
+#     ]
+#
+# color.rgb_to_rgba:
+#   alpha_val: [1.0]
 
-color.multiple:
-  mode:
-    [
-      'bgr_to_rgb',
-      'rgb_to_grayscale',
-      'rgb_to_hls',
-      'rgb_to_hsv',
-      'rgb_to_lab',
-      'rgb_to_luv',
-      'rgb_to_xyz',
-      'rgb_to_ycbcr',
-      'rgb_to_yuv',
-    ]
+# filters.bilateral:
+#     kernel_size: [3, 25]
+#     sigma_color: [50.5,] # 1.5]
+#     sigma_space: [38.9,] # 2.7]
+#     # NOTE: OpenCV always perfom with "l1", "l2" is a matlab based implementation
+#     color_distance_type: ["l1", "l2"]
 
-color.rgb_to_rgba:
-  alpha_val: [1.0]
+# filters.gaussian:
+#     kernel_size: [3, 25]
+#     sigma: [[7.5, 10.5], [0.5, 0.75]] # 1.5]
+
+# filters.canny:
+#     # TODO: Inject config for generate the input info
+#     # CFG:
+#     #    max_img: 255
+#     #    cast: True
+#     low_threshold: [0.1, 0.5]
+#     high_threshold: [0.6, 0.9]
+#     kernel_size: [3, 25]
+
+# filters.laplacian:
+#     kernel_size: [3, 25]
+
+# filters.median_blur:
+#    kernel_size: [3, 25]
+
+# filters.sobel:
+#     no_args: true
+
+# filters.motion:
+#     kernel_size: [3, 25]
+#     angle: [120.0, -75.0]
+#     # TODO: add direction to do something on opencv case
+#     direction: [0.0]
+
+# filters.unsharp:
+#     kernel_size: [3, 25]
+#     sigma: [[1.5, 1.5], [75.5, 85.5]]
+
+filters.jointbilateral:
+    # NOTE: we should overwrite the resolution here to align with the guidance
+    batch_sizes: [2,]
+    resolutions: [128,]
+    guidance:
+        ones: [2, 3, 128, 128]
+    kernel_size: [3, 25]
+    sigma_color: [50.5,] # 1.5]
+    sigma_space: [38.9,] # 2.7]
+    # NOTE: OpenCV always perfom with "l1", "l2" is a matlab based implementation
+    color_distance_type: ["l1", "l2"]

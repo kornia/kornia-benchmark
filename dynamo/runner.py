@@ -60,11 +60,9 @@ def create_inputs(
         device: torch.device = torch.device('cpu'),
         RGB: bool = True,
 ) -> Tensor | np.ndarray:
-
+    shape = (bs, 3, res, res) if isinstance(bs, int) else (3, res, res)
     if RGB:
-        x_tensor = torch.ones((3, res, res), dtype=dtype, device=device)
-        if bs is not None:
-            x_tensor = x_tensor[None].repeat(bs, 1, 1, 1)
+        x_tensor = torch.rand(shape, dtype=dtype, device=device)
     else:
         # TODO
         raise NotImplementedError
@@ -73,6 +71,7 @@ def create_inputs(
         return x_tensor
 
     x_array: np.ndarray = x_tensor.detach().cpu().numpy()
+    x_array = np.moveaxis(x_array, 1, -1)
     return x_array
 
 
@@ -205,7 +204,7 @@ def load_config(filename: str) -> list[dict[str, Any]]:
         for lc in dict_product(
             {
                 cn: _unpack_config(cv) for cn, cv in v.items()
-                if cv not in DEFAULT_CONFIGS and cn != 'no_args'
+                if cn not in DEFAULT_CONFIGS and cn != 'no_args'
             },
         )
     ]
@@ -406,6 +405,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sig = generate_graphs(filename=args.output_filename)
 
     return sig
+
 
 if __name__ == '__main__':
     raise SystemExit(main())
