@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import logging
 import pickle
@@ -11,8 +13,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
-from typing import Tuple
-from typing import Union
 
 import numpy as np
 import torch
@@ -20,6 +20,7 @@ import torch._dynamo as dynamo
 import torch.utils.benchmark as benchmark
 import yaml
 from kornia.core import Tensor
+from plot import graphs_from_results
 from yaml.loader import SafeLoader
 
 
@@ -52,13 +53,13 @@ def set_op_to_bench(module: str, operator: str, optimizer: Any) -> None:
 
 
 def create_inputs(
-        bs: Optional[int],
+        bs: int | None,
         res: int,
         out_t: str,
         dtype: torch.dtype = torch.float32,
         device: torch.device = torch.device('cpu'),
         RGB: bool = True,
-) -> Union[Tensor, np.ndarray]:
+) -> Tensor | np.ndarray:
 
     if RGB:
         x_tensor = torch.ones((3, res, res), dtype=dtype, device=device)
@@ -76,14 +77,14 @@ def create_inputs(
 
 
 def _iter_cfg(
-        configs: List[Dict[str, Any]],
-) -> Tuple[Dict[str, Any], int, int, int]:
+        configs: list[dict[str, Any]],
+) -> tuple[dict[str, Any], int, int, int]:
     for cfg in configs:
         for bs, res in product(cfg['batch_sizes'], cfg['resolutions']):
             yield cfg, bs, res
 
 
-def _iter_op_device() -> Tuple[str, str, str, Tuple[Any]]:
+def _iter_op_device() -> tuple[str, str, str, tuple[Any]]:
     # TODO: Maybe automate this?
     _iters = [
         ('kornia_op', 'tensor', 'cpu', None),
@@ -110,9 +111,9 @@ def _check_run(
         verbose: bool,
         module: str,
         operator: str,
-        x: Union[Tensor, np.ndarray],
+        x: Tensor | np.ndarray,
         optimizer: Any,
-        **kwargs: Dict[str, Any]
+        **kwargs: dict[str, Any]
 ) -> bool:
     try:
         op = _load_operator(module, operator, optimizer)
@@ -134,8 +135,8 @@ def _check_run(
 
 def _unpack_config_or_load_global(
         config_name: str,
-        data: Dict[str, Any],
-        global_data: Dict[str, Any],
+        data: dict[str, Any],
+        global_data: dict[str, Any],
 ) -> Any:
     if config_name in data:
         return data[config_name]
@@ -144,11 +145,11 @@ def _unpack_config_or_load_global(
 
 
 def create_ones(
-        shape: Tuple[int, ...],
+        shape: tuple[int, ...],
         out_t: str,
         dtype: torch.dtype = torch.float32,
         device: torch.device = torch.device('cpu'),
-) -> Union[Tensor, np.ndarray]:
+) -> Tensor | np.ndarray:
     x_tensor = torch.ones(shape, dtype=dtype, device=device)
     if out_t == 'tensor':
         return x_tensor
@@ -183,7 +184,7 @@ def dict_product(data):
         yield {**out_prod, **others}
 
 
-def load_config(filename: str) -> List[Dict[str, Any]]:
+def load_config(filename: str) -> list[dict[str, Any]]:
     with open(filename) as f:
         data = yaml.load(f, Loader=SafeLoader)
 
@@ -225,7 +226,7 @@ def _unpick(filename: str) -> list[Any]:
 
 
 def _build_kwargs(
-        f_kwargs: Dict[str, Any],
+        f_kwargs: dict[str, Any],
         out_t: str,
         dtype: torch.dtype = torch.float32,
         device: torch.device = torch.device('cpu'),
@@ -242,7 +243,7 @@ def _build_kwargs(
 
 
 def run(
-        configs: List[Dict[str, Any]],
+        configs: list[dict[str, Any]],
         output_filename: str,
         verbose: bool,
 ) -> int:
@@ -339,7 +340,13 @@ def run(
     return 0
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def generate_graphs(filename: str) -> int:
+    # Load the results: will be a list of torch Measurement
+    graphs_from_results(_unpick(filename))
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     parser = argparse.ArgumentParser(
         prog='Performance kornia CLI',
@@ -361,6 +368,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         action='store_true',
         default=False,
     )
+    parser.add_argument(
+        '--save-graphs',
+        action='store_true',
+        default=False,
+        help=(
+            'From the benchmark file, generate a graph for each operation'
+            'comparing the benchmarks.'
+        ),
+    )
+
     _dt = datetime.strftime(datetime.utcnow(), '%Y%m%d_%H%M%S')
     parser.add_argument(
         '--output-filename',
@@ -379,12 +396,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         torch._dynamo.config.verbose = True
         torch._dynamo.config.log_level = logging.DEBUG
 
-    return run(
+    sig = run(
         configs,
         output_filename=args.output_filename,
         verbose=args.verbose or args.debug,
     )
 
+    if args.save_graphs:
+        sig = generate_graphs(filename=args.output_filename)
+
+    return sig
 
 if __name__ == '__main__':
     raise SystemExit(main())
