@@ -1,13 +1,12 @@
 from itertools import product
 
 import cv2
+import kornia as K
 import numpy as np
 import torch
 import torch._dynamo as dynamo
-import torch.utils.benchmark as benchmark
-
-import kornia as K
 import torch.nn.functional as F
+import torch.utils.benchmark as benchmark
 
 
 torch.set_float32_matmul_precision('high')
@@ -23,8 +22,9 @@ def remap_opencv(image, map_x, map_y, batch_size):
         outs.append(out)
     return np.stack(outs)
 
+
 def remap_kornia_eager_new(image, map_xy):
-    return F.grid_sample(image, map_xy, mode="bilinear")
+    return F.grid_sample(image, map_xy, mode='bilinear')
 
 
 def remap_kornia_eager_old(image, map_x, map_y):
@@ -32,8 +32,9 @@ def remap_kornia_eager_old(image, map_x, map_y):
         image,
         map_x,
         map_y,
-        mode="bilinear",
-        normalized_coordinates=True)
+        mode='bilinear',
+        normalized_coordinates=True,
+    )
 
 
 @torch.jit.script
@@ -41,7 +42,7 @@ def remap_kornia_jit_old(image, map_x, map_y):
     return remap_kornia_eager_old(image, map_x, map_y)
 
 
-@dynamo.optimize("inductor")
+@dynamo.optimize('inductor')
 def remap_kornia_dynamo_old(image, map_x, map_y):
     return remap_kornia_eager_old(image, map_x, map_y)
 
@@ -51,7 +52,7 @@ def remap_kornia_jit_new(image, map_xy):
     return remap_kornia_eager_new(image, map_xy)
 
 
-@dynamo.optimize("inductor")
+@dynamo.optimize('inductor')
 def remap_kornia_dynamo_new(image, map_xy):
     return remap_kornia_eager_new(image, map_xy)
 
@@ -66,18 +67,18 @@ resolutions = [(400, 640)]
 threads = [1, 4, 8]
 
 # backends = ["eager", "jit", "dynamo"]
-backends = ["eager", "dynamo"]
-versions = ["new", "old"]
-devices = ["cpu"]
-#devices = ["cpu", "cuda"]
-dtypes = ["float16", "float32", "float64"]
+backends = ['eager', 'dynamo']
+versions = ['new', 'old']
+devices = ['cpu']
+# devices = ["cpu", "cuda"]
+dtypes = ['float16', 'float32', 'float64']
 
 
 def convert_to(data, device: str, dtype: str):
-    return data.to(torch.device(device), eval(f"torch.{dtype}"))
+    return data.to(torch.device(device), eval(f'torch.{dtype}'))
 
 
-def generate_sample(batch_size, channels, height, width, device: str, dtype: str, data_backend = "torch", normalized = True):
+def generate_sample(batch_size, channels, height, width, device: str, dtype: str, data_backend='torch', normalized=True):
     img = torch.ones((batch_size, channels, height, width))
     base_grid = K.utils.create_meshgrid(height, width, normalized_coordinates=normalized)
     base_grid = base_grid.repeat(batch_size, 1, 1, 1)
@@ -88,11 +89,11 @@ def generate_sample(batch_size, channels, height, width, device: str, dtype: str
     map_x = convert_to(map_x, device, dtype)
     map_y = convert_to(map_y, device, dtype)
     # to numpy (if needed)
-    if data_backend == "numpy":
+    if data_backend == 'numpy':
         img = K.utils.tensor_to_image(img[0])
         map_x = K.utils.tensor_to_image(map_x[0])
         map_y = K.utils.tensor_to_image(map_y[0])
-    return  img, map_x, map_y
+    return img, map_x, map_y
 
 
 for b, ch, (h, w) in product(batch_sizes, channels, resolutions):
@@ -101,16 +102,16 @@ for b, ch, (h, w) in product(batch_sizes, channels, resolutions):
     label = 'Remap'
     sub_label = f'[{b}x{ch}x{h}x{w}]'
     for num_threads in threads:
-        for bck, device, dtype, ver in  product(backends, devices, dtypes, versions):
-            if device == "cpu" and dtype == "float16":
+        for bck, device, dtype, ver in product(backends, devices, dtypes, versions):
+            if device == 'cpu' and dtype == 'float16':
                 continue  # RuntimeError: grid_sampler_2d_cpu not implemented for Half
             base_desc = f'{bck}_{ver}'  # e.g. eager_old
             base_fcn = f'remap_kornia_{base_desc}'
             image, map_x, map_y = generate_sample(b, ch, h, w, device, dtype)  # move data to device
-            if ver == "old":
+            if ver == 'old':
                 stmt = f'{base_fcn}(image, map_x, map_y)'
                 globals = {'image': image, 'map_x': map_x, 'map_y': map_y}
-            elif ver == "new":
+            elif ver == 'new':
                 stmt = f'{base_fcn}(image, map_xy)'
                 globals = {'image': image, 'map_xy': torch.stack((map_x, map_y), -1)}
             results.append(
@@ -122,11 +123,12 @@ for b, ch, (h, w) in product(batch_sizes, channels, resolutions):
                     label=label,
                     sub_label=f'{sub_label}[{dtype}][{device}]',
                     description=f'{base_desc}',
-                ).blocked_autorange(min_run_time=1)
+                ).blocked_autorange(min_run_time=1),
             )
         # test case for opencv
         image, map_x, map_y = generate_sample(
-            b, ch, h, w, device="cpu", dtype="float32", data_backend="numpy")  # move data to device
+            b, ch, h, w, device='cpu', dtype='float32', data_backend='numpy',
+        )  # move data to device
         results.append(
             benchmark.Timer(
                 stmt='remap_opencv(image, map_x, map_y, batch_size)',
@@ -136,7 +138,7 @@ for b, ch, (h, w) in product(batch_sizes, channels, resolutions):
                 label=label,
                 sub_label=f'{sub_label}[float32][cpu]',
                 description='opencv_cpu',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
 
 compare = benchmark.Compare(results)
