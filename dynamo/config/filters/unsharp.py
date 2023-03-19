@@ -9,7 +9,7 @@ from kornia.core import Tensor
 def kornia_op(
         input: Tensor,
         kernel_size: int,
-        sigma: tuple[float, float]
+        sigma: tuple[float, float],
 ) -> None:
 
     kornia.filters.unsharp_mask(input, kernel_size, tuple(sigma))
@@ -18,7 +18,7 @@ def kornia_op(
 def opencv_op(
         input: np.ndarray,
         kernel_size: int,
-        sigma: tuple[float, float]
+        sigma: tuple[float, float],
 ) -> None:
     # simulate batch as sequential op
     if len(input.shape) == 3:

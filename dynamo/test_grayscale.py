@@ -1,19 +1,17 @@
 from itertools import product
-import logging
 
 import cv2
+import kornia
 import torch
 import torch._dynamo as dynamo
 import torch.utils.benchmark as benchmark
-
-import kornia
 
 
 torch.set_float32_matmul_precision('high')
 # torch._dynamo.config.verbose=True
 # torch._dynamo.config.log_level = logging.DEBUG
 
-torch_dynamo_optimize = dynamo.optimize("inductor")
+torch_dynamo_optimize = dynamo.optimize('inductor')
 
 op = kornia.color.rgb_to_grayscale
 op_dyn = torch_dynamo_optimize(op)
@@ -27,7 +25,7 @@ def opencv(x):
         x = x[None]
     for i in range(x.shape[0]):
         x_np = kornia.tensor_to_image(x[i])
-        y_np = cv2.cvtColor(x_np, cv2.COLOR_RGB2GRAY)
+        cv2.cvtColor(x_np, cv2.COLOR_RGB2GRAY)
 
 
 # Compare takes a list of measurements which we'll save in results.
@@ -55,7 +53,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='eager_cpu',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
         results.append(
             benchmark.Timer(
@@ -66,7 +64,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='eager_cuda',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
         results.append(
             benchmark.Timer(
@@ -77,7 +75,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='dynamo_cpu',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
         results.append(
             benchmark.Timer(
@@ -88,7 +86,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='dynamo_cuda',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
         results.append(
             benchmark.Timer(
@@ -99,7 +97,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='opencv',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
 
 compare = benchmark.Compare(results)

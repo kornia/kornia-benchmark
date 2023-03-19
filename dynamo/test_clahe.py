@@ -1,18 +1,16 @@
 from itertools import product
-import logging
 
 import cv2
+import kornia
 import torch
 import torch._dynamo as dynamo
 import torch.utils.benchmark as benchmark
-
-import kornia
 
 torch.set_float32_matmul_precision('high')
 # torch._dynamo.config.verbose=True
 # torch._dynamo.config.log_level = logging.DEBUG
 
-torch_dynamo_optimize = dynamo.optimize("inductor")
+torch_dynamo_optimize = dynamo.optimize('inductor')
 
 op = kornia.enhance.equalize_clahe
 op_dyn = torch_dynamo_optimize(op)
@@ -60,7 +58,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='eager_cpu',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
         if torch.cuda.is_available():
             results.append(
@@ -72,7 +70,7 @@ for b, n in product(batch_sizes, resolution):
                     label=label,
                     sub_label=sub_label,
                     description='eager_cuda',
-                ).blocked_autorange(min_run_time=1)
+                ).blocked_autorange(min_run_time=1),
             )
         results.append(
             benchmark.Timer(
@@ -83,7 +81,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='dynamo_cpu',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
         if torch.cuda.is_available():
             results.append(
@@ -95,7 +93,7 @@ for b, n in product(batch_sizes, resolution):
                     label=label,
                     sub_label=sub_label,
                     description='dynamo_cuda',
-                ).blocked_autorange(min_run_time=1)
+                ).blocked_autorange(min_run_time=1),
             )
         results.append(
             benchmark.Timer(
@@ -106,7 +104,7 @@ for b, n in product(batch_sizes, resolution):
                 label=label,
                 sub_label=sub_label,
                 description='opencv',
-            ).blocked_autorange(min_run_time=1)
+            ).blocked_autorange(min_run_time=1),
         )
 
 compare = benchmark.Compare(results)
