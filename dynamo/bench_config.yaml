@@ -3,15 +3,15 @@ global:
     [
       1,
       # 2,
-      5,
+      # 5,
       # 9
     ]
   resolutions:
     [
       # 32,
-      # 64,
-      128,
-      256,
+      64,
+      # 128,
+      # 256,
       # 512
     ]
   threads:
@@ -130,3 +130,32 @@ filters.jointbilateral:
     sigma_space: [38.9,] # 2.7]
     # NOTE: OpenCV always perfom with "l1", "l2" is a matlab based implementation
     color_distance_type: ["l1", "l2"]
+
+augmentation.multiple:
+  mode:
+    [
+      'RandomAffine',
+      'ColorJiggle',
+      'RandomBoxBlur',
+      'RandomBrightness',
+      'RandomChannelShuffle',
+      'RandomContrast',
+      'RandomEqualize',
+      'RandomGamma',
+      'RandomGaussianBlur',
+      'RandomGaussianNoise',
+      'RandomHue',
+      'RandomRGBShift',
+      'RandomSaturation',
+      'RandomSharpness',
+      'RandomSolarize',
+      'PadTo',
+      'RandomCrop',
+      'RandomErasing',
+      'RandomFisheye',
+      'RandomInvert',
+      'RandomPerspective',
+      'RandomResizedCrop',
+      'RandomRotation',
+      'RandomVerticalFlip',
+    ]
