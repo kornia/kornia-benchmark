@@ -21,7 +21,10 @@ global:
       # 8
     ]
   import_from: 'config'
-
+  np_dtype: float32
+  np_maxvalue: 1.0
+  torch_dtype: float32
+  torch_maxvalue: 1.0
 
 # geometry.transform.rescale:
 #   factor:
@@ -31,6 +34,8 @@ global:
 #     ]
 #
 # morphology.dilation:
+#   # np_dtype: uint8
+#   # np_maxvalue: 255
 #   kernel:
 #     ones:
 #       [9, 9]

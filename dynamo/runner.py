@@ -45,27 +45,48 @@ def set_op_to_bench(module: str, operator: str, optimizer: Any) -> None:
 
 
 def create_inputs(
-    bs: int | None,
-    res: int,
-    out_t: str,
-    dtype: torch.dtype = torch.float32,
-    device: torch.device = torch.device('cpu'),
-    RGB: bool = True,
+        bs: int | None,
+        res: int,
+        out_t: str,
+        torch_dtype: str,
+        torch_maxvalue: float,
+        np_dtype: str,
+        np_maxvalue: float,
+        device: torch.device,
+        RGB: bool = True,
 ) -> Tensor | np.ndarray:
+    if torch_dtype == 'float32':
+        tdtype = torch.float32
+    elif torch_dtype == 'float64':
+        tdtype = torch.float64
+    elif torch_dtype == 'float16':
+        tdtype = torch.float16
+
+    if np_dtype == 'float32':
+        ndtype = np.float32
+    elif np_dtype == 'float64':
+        ndtype = np.float64
+    elif np_dtype == 'float16':
+        ndtype = np.float16
+    elif np_dtype == 'uint8':
+        ndtype = np.uint8
 
     shape = (bs, 3, res, res) if isinstance(bs, int) else (3, res, res)
 
     if RGB:
-        x_tensor = torch.rand(shape, dtype=dtype, device=device)
+        x_tensor = torch.rand(shape, dtype=tdtype, device=device)
     else:
         # TODO
         raise NotImplementedError
 
     if out_t == 'tensor':
-        return x_tensor
+        return x_tensor * torch_maxvalue
 
     x_array = x_tensor.detach().cpu().numpy()
     x_array = np.moveaxis(x_array, 1, -1)
+    x_array = x_array * np_maxvalue
+    x_array = x_array.astype(ndtype)
+
     return x_array
 
 
@@ -173,7 +194,10 @@ def load_config(filename: str) -> list[dict[str, Any]]:
 
     global_config = data['global']
 
-    DEFAULT_CONFIGS = ['batch_sizes', 'resolutions', 'threads', 'import_from']
+    DEFAULT_CONFIGS = [
+        'batch_sizes', 'resolutions', 'threads', 'import_from', 'np_dtype',
+        'np_maxvalue', 'torch_dtype', 'torch_maxvalue',
+    ]
 
     config = [
         {
@@ -231,7 +255,14 @@ def run(configs: list[dict[str, Any]], output_filename: str, verbose: bool) -> i
         print('-'*79,  f'\n-> Benchmarking{_op_dev_txt}')
 
         for cfg, bs, res in _iter_cfg(configs):
-            x = create_inputs(bs, res, input_type, device=torch.device(device))
+            x = create_inputs(
+                bs, res, input_type,
+                torch_dtype=cfg['torch_dtype'],
+                torch_maxvalue=float(cfg['torch_maxvalue']),
+                np_dtype=cfg['np_dtype'],
+                np_maxvalue=float(cfg['np_maxvalue']),
+                device=torch.device(device),
+            )
 
             kwargs = _build_kwargs(cfg['kwargs'], out_t=input_type, device=torch.device(device))
 
@@ -275,6 +306,7 @@ def run(configs: list[dict[str, Any]], output_filename: str, verbose: bool) -> i
                 print('\033[1;32m\t\t-> Saving benchmark...\033[0;0m')
                 pickle.dump(bench_out, fp, protocol=pickle.HIGHEST_PROTOCOL)
     fp.close()
+
     ab_results = _unpick(output_filename)
     compare = benchmark.Compare(ab_results)
     compare.print()

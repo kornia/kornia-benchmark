@@ -2,7 +2,7 @@ import cv2
 import kornia
 import numpy as np
 
-kornia_op =  kornia.morphology.bottom_hat
+kornia_op = kornia.morphology.bottom_hat
 
 
 def opencv_op(
@@ -12,7 +12,6 @@ def opencv_op(
         **kwargs
 ) -> None:
     # simulate batch as sequential op
-    input = input.astype(np.uint8)
     kernel = kernel.astype(np.uint8)
     if len(input.shape) == 3:
         input = input[None]
