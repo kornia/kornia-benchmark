@@ -13,7 +13,6 @@ from typing import Sequence
 
 import numpy as np
 import torch
-import torch._dynamo as dynamo
 import torch.utils.benchmark as benchmark
 import yaml
 from kornia.core import Tensor
@@ -22,7 +21,7 @@ from yaml.loader import SafeLoader
 
 
 torch.set_float32_matmul_precision('high')
-torch_dynamo_optimize = dynamo.optimize('inductor')
+torch_dynamo_optimize = torch.compile
 
 
 def not_implemented_op(*args, **kwargs) -> None:
