@@ -16,15 +16,13 @@ DATA_PATH = Path(__file__).parent / "dog.jpeg"
 
 
 def kornia_preprocess(img_path: Path) -> torch.Tensor:
-    # img = KR.read_image_jpeg(str(img_path))  # HxWxC
-    img = np.random.randint(0, 256, (256, 320, 3), dtype=np.uint8)
+    img = KR.read_image_jpeg(str(img_path))  # HxWxC
     img = KR.resize(img, (224, 224), interpolation="bilinear")
     return img
 
 
 def opencv_preprocess(img_path: Path) -> torch.Tensor:
-    # img = cv2.imread(str(img_path))  # HxWxC
-    img = np.random.randint(0, 256, (256, 320, 3), dtype=np.uint8)
+    img = cv2.imread(str(img_path))  # HxWxC
     img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_LINEAR)
     return img
 
@@ -34,8 +32,8 @@ class MockImageDataset(torch.utils.data.Dataset):
 
     def __init__(
         self,
+        strategy: str,
         augmentations_fn: callable | None = None,
-        strategy: str = "hybrid",
     ):
         self.augmentations_fn = augmentations_fn
         self.strategy = strategy
@@ -117,8 +115,11 @@ def main() -> None:
     augmentations_fn = None
     if args.augmentations_strategy == "hybrid":
         augmentations_fn = torch.nn.Sequential(
-            K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1),
+            K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).to(accelerate.device),
+            # NOTE: this is not supported by Kornia yet
+            # K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).cuda(),
         )
+        # NOTE: this is not supported by Kornia yet
         # augmentations_fn = torch.compile(augmentations_fn)
     else:
         augmentations_fn = A.Compose(
