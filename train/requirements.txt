@@ -3,3 +3,4 @@ torchvision
 accelerate
 tqdm
 opencv-python
+albumentations
