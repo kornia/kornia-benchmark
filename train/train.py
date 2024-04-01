@@ -12,6 +12,8 @@ import cv2
 import albumentations as A
 import numpy as np
 
+torch.set_float32_matmul_precision("high")
+
 DATA_PATH = Path(__file__).parent / "dog.jpeg"
 
 
@@ -80,7 +82,7 @@ def main() -> None:
     parser.add_argument(
         "--num-tests",
         type=int,
-        default=16,
+        default=8,
         help="The number of tests to run to compute the mean and median.",
     )
     parser.add_argument(
@@ -115,12 +117,13 @@ def main() -> None:
     augmentations_fn = None
     if args.augmentations_strategy == "hybrid":
         augmentations_fn = torch.nn.Sequential(
-            K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).to(accelerate.device),
+            # K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).to(accelerate.device),
+            tv.transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
             # NOTE: this is not supported by Kornia yet
             # K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).cuda(),
         )
         # NOTE: this is not supported by Kornia yet
-        # augmentations_fn = torch.compile(augmentations_fn)
+        augmentations_fn = torch.compile(augmentations_fn)
     else:
         augmentations_fn = A.Compose(
             [
