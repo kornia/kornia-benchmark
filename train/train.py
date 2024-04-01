@@ -10,20 +10,21 @@ from accelerate import Accelerator
 from tqdm import tqdm
 import cv2
 import albumentations as A
+import numpy as np
 
 DATA_PATH = Path(__file__).parent / "dog.jpeg"
 
 
 def kornia_preprocess(img_path: Path) -> torch.Tensor:
-    img = KR.read_image_jpeg(str(img_path))  # HxWxC
+    # img = KR.read_image_jpeg(str(img_path))  # HxWxC
+    img = np.random.randint(0, 256, (256, 320, 3), dtype=np.uint8)
     img = KR.resize(img, (224, 224), interpolation="bilinear")
-    img = K.utils.image_to_tensor(img, keepdim=True)  # CxHxW
-    img = img.float() / 255.0
     return img
 
 
 def opencv_preprocess(img_path: Path) -> torch.Tensor:
-    img = cv2.imread(str(img_path))  # HxWxC
+    # img = cv2.imread(str(img_path))  # HxWxC
+    img = np.random.randint(0, 256, (256, 320, 3), dtype=np.uint8)
     img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_LINEAR)
     return img
 
@@ -50,8 +51,9 @@ class MockImageDataset(torch.utils.data.Dataset):
             if self.augmentations_fn is not None:
                 out = self.augmentations_fn(image=img)
                 img = out["image"]
-            img = K.utils.image_to_tensor(img)
-            img = img.float() / 255.0
+
+        img = K.utils.image_to_tensor(img)
+        img = img.float() / 255.0
 
         label = torch.tensor(0)
         return img, label
@@ -67,7 +69,8 @@ def train_one_epoch(
     for data, target in tqdm(dataloader):
         optimizer.zero_grad()
         if augmentations_fn is not None:
-            data = augmentations_fn(data)
+            with torch.no_grad():
+                data = augmentations_fn(data)
         output = model(data)
         loss = torch.nn.functional.cross_entropy(output, target)
         loss.backward()
@@ -76,6 +79,12 @@ def train_one_epoch(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--num-tests",
+        type=int,
+        default=16,
+        help="The number of tests to run to compute the mean and median.",
+    )
     parser.add_argument(
         "--batch-size", type=int, default=32, help="The batch size to use for training."
     )
@@ -110,6 +119,7 @@ def main() -> None:
         augmentations_fn = torch.nn.Sequential(
             K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1),
         )
+        # augmentations_fn = torch.compile(augmentations_fn)
     else:
         augmentations_fn = A.Compose(
             [
@@ -125,6 +135,7 @@ def main() -> None:
         dataset,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
+        pin_memory=True,
     )
 
     model = tv.models.resnet50(weights=None)
@@ -137,7 +148,6 @@ def main() -> None:
         augmentations_fn,
     )
 
-    num_tests = 25
     num_threads = torch.get_num_threads()
 
     print(f"Benchmarking in {num_threads} threads")
@@ -157,7 +167,7 @@ def main() -> None:
         label=f"Training ResNet50 with {args.augmentations_strategy} augmentations",
         sub_label=f"batch_size={args.batch_size}",
     )
-    res = timer.timeit(num_tests)
+    res = timer.timeit(args.num_tests)
 
     print(f"Mean:   {res.mean * 1000} ms")
     print(f"Median: {res.median * 1000} ms")
