@@ -108,6 +108,11 @@ def main() -> None:
         default="hybrid",
         help="Preprocessing backend",
     )
+    parser.add_argument(
+        "--with-compile",
+        action="store_true",
+        help="Whether to torch.compile the augmentations function.",
+    )
     args = parser.parse_args()
 
     accelerate = Accelerator(
@@ -117,13 +122,13 @@ def main() -> None:
     augmentations_fn = None
     if args.augmentations_strategy == "hybrid":
         augmentations_fn = torch.nn.Sequential(
-            # K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).to(accelerate.device),
-            tv.transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
+            K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).to(accelerate.device),
             # NOTE: this is not supported by Kornia yet
             # K.augmentation.ColorJitter(0.1, 0.1, 0.1, 0.1).cuda(),
         )
-        # NOTE: this is not supported by Kornia yet
-        augmentations_fn = torch.compile(augmentations_fn)
+        # NOTE: this is not supported by Kornia yet, run with --with-compile but it will fail
+        if args.with_compile:
+            augmentations_fn = torch.compile(augmentations_fn)
     else:
         augmentations_fn = A.Compose(
             [
